@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Breeze + Jev Backtester</title>
+<style>
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#171717;background:#f4f4f5}*{box-sizing:border-box}body{margin:0}header{background:#111827;color:#fff;padding:18px 24px}header h1{margin:0;font-size:22px}header p{margin:6px 0 0;color:#cbd5e1;font-size:13px}.wrap{max-width:1450px;margin:0 auto;padding:18px}.grid{display:grid;grid-template-columns:380px 1fr;gap:16px}.card{background:#fff;border:1px solid #e4e4e7;border-radius:12px;padding:16px;margin-bottom:16px}.card h2{margin:0 0 12px;font-size:16px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}label{font-size:12px;font-weight:600;color:#52525b;display:block;margin:8px 0 4px}input,select,button{width:100%;border:1px solid #d4d4d8;border-radius:7px;padding:9px 10px;font:inherit;background:#fff}button{cursor:pointer;background:#18181b;color:#fff;border-color:#18181b;font-weight:600}button.secondary{background:#fff;color:#18181b}button.danger{background:#fff;color:#b91c1c;border-color:#fecaca}small,.muted{color:#71717a;font-size:12px}.status{padding:10px;border-radius:8px;background:#f4f4f5;font-size:12px;white-space:pre-wrap}.symbols{display:flex;flex-direction:column;gap:8px}.symbol{border:1px solid #e4e4e7;border-radius:8px;padding:9px}.symbol strong{display:block}.symbol .actions{display:flex;gap:6px;margin-top:7px}.symbol .actions button{padding:5px 7px;font-size:11px}.metrics{display:grid;grid-template-columns:repeat(6,minmax(100px,1fr));gap:10px}.metric{border:1px solid #e4e4e7;border-radius:9px;padding:11px}.metric .k{font-size:11px;color:#71717a}.metric .v{font-size:20px;font-weight:700;margin-top:4px}.tabs{display:flex;gap:6px;margin:14px 0}.tabs button{width:auto;padding:7px 10px;background:#fff;color:#18181b}.tabs button.active{background:#18181b;color:#fff}.pane{display:none}.pane.active{display:block}.chart{width:100%;height:280px;border:1px solid #e4e4e7;border-radius:8px;background:#fff}.chart svg{width:100%;height:100%}.tablewrap{overflow:auto;max-height:460px;border:1px solid #e4e4e7;border-radius:8px}table{border-collapse:collapse;width:100%;font-size:12px}th,td{padding:8px;border-bottom:1px solid #eee;text-align:left;white-space:nowrap}th{position:sticky;top:0;background:#fafafa;z-index:1}.error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;padding:10px;border-radius:8px;white-space:pre-wrap}.ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;padding:10px;border-radius:8px}.busy{opacity:.55;pointer-events:none}.advanced summary{cursor:pointer;font-weight:600;margin:8px 0}@media(max-width:1000px){.grid{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header><h1>Breeze + Jev Options Backtester</h1><p>Historical Breeze replay → lagged spot/option diagnostics → heuristic or Jev decisions → deterministic risk → next-candle simulated fills.</p></header>
+<div class="wrap">
+<div id="message"></div>
+<div class="grid">
+<aside>
+  <section class="card">
+    <h2>Breeze authentication</h2>
+    <div id="authStatus" class="status">Loading…</div>
+    <label>Today's API_Session token</label>
+    <input id="sessionToken" type="password" placeholder="Paste token" />
+    <div class="row" style="margin-top:8px"><button onclick="activateSession()">Activate session</button><button class="secondary" onclick="openLogin()">Open ICICI login</button></div>
+  </section>
+  <section class="card">
+    <h2>Tracked symbols</h2>
+    <div id="symbols" class="symbols"></div>
+    <hr style="border:none;border-top:1px solid #eee;margin:14px 0">
+    <label>Display name</label><input id="symName" placeholder="NIFTY" />
+    <label>Breeze stock code</label><input id="symCode" placeholder="NIFTY" />
+    <div class="row"><div><label>Strike step</label><input id="symStep" type="number" value="50" step="0.05" /></div><div><label>Lot size</label><input id="symLot" type="number" value="1" /></div></div>
+    <div class="row"><div><label>Cash exchange</label><input id="symCash" value="NSE" /></div><div><label>Option exchange</label><input id="symOpt" value="NFO" /></div></div>
+    <button style="margin-top:10px" onclick="addSymbol()">Add symbol</button>
+  </section>
+</aside>
+<main>
+  <section class="card" id="backtestCard">
+    <h2>Backtest</h2>
+    <div class="row3">
+      <div><label>Symbol</label><select id="btSymbol"></select></div>
+      <div><label>Engine</label><select id="btEngine"><option value="heuristic">Heuristic baseline</option><option value="jev">TypeSafe Jev</option></select></div>
+      <div><label>Interval</label><select id="btInterval"><option>1minute</option><option>1second</option><option>5minute</option><option>30minute</option><option>1day</option></select></div>
+    </div>
+    <div class="row3">
+      <div><label>Start date</label><input id="btStart" type="date" /></div>
+      <div><label>End date</label><input id="btEnd" type="date" /></div>
+      <div><label>Option expiry</label><input id="btExpiry" type="date" /></div>
+    </div>
+    <div class="row3">
+      <div><label>Lots</label><input id="btLots" type="number" value="1" min="1" /></div>
+      <div><label>Min model confidence</label><input id="btConf" type="number" value="0.62" min="0" max="1" step="0.01" /></div>
+      <div><label>Strike offsets</label><input id="btOffsets" type="number" value="0" min="0" max="3" /></div>
+    </div>
+    <details class="advanced">
+      <summary>Advanced replay / risk / cost controls</summary>
+      <div class="row3">
+        <div><label>Warm-up bars</label><input id="btWarm" type="number" value="30" /></div>
+        <div><label>Decision every N bars</label><input id="btCadence" type="number" value="1" /></div>
+        <div><label>Event trigger %</label><input id="btTrigger" type="number" value="0" step="0.01" /></div>
+      </div>
+      <div class="row3">
+        <div><label>Stop loss %</label><input id="btStop" type="number" value="12" step="0.5" /></div>
+        <div><label>Take profit %</label><input id="btTarget" type="number" value="20" step="0.5" /></div>
+        <div><label>Max hold bars</label><input id="btHold" type="number" value="12" /></div>
+      </div>
+      <div class="row3">
+        <div><label>Slippage bps / side</label><input id="btSlip" type="number" value="5" step="0.5" /></div>
+        <div><label>Turnover fees bps / side</label><input id="btFees" type="number" value="3" step="0.5" /></div>
+        <div><label>Brokerage / order</label><input id="btBroker" type="number" value="20" step="1" /></div>
+      </div>
+      <div class="row3">
+        <div><label>Max trades / day</label><input id="btMaxTrades" type="number" value="6" /></div>
+        <div><label>Max capital / trade</label><input id="btMaxCapital" type="number" value="100000" /></div>
+        <div><label>Max contracts loaded</label><input id="btMaxContracts" type="number" value="40" /></div>
+      </div>
+      <div class="row3"><div><label>Entry cutoff</label><input id="btCutoff" value="15:05" /></div><div><label>Square off</label><input id="btSquare" value="15:20" /></div><div><label>Refresh Breeze cache</label><select id="btRefresh"><option value="false">No</option><option value="true">Yes</option></select></div></div>
+    </details>
+    <button id="runBtn" style="margin-top:12px" onclick="runBacktest()">Run backtest</button>
+    <p class="muted">For Jev, start with a short period and/or a larger decision cadence. Each unseen state can cause an external model call; identical states are cached.</p>
+  </section>
+
+  <section class="card">
+    <h2>Results</h2>
+    <div id="emptyResult" class="status">Run a backtest or load a previous run.</div>
+    <div id="result" style="display:none">
+      <div id="metrics" class="metrics"></div>
+      <div class="tabs">
+        <button class="active" data-pane="charts" onclick="tab(this)">Charts</button>
+        <button data-pane="trades" onclick="tab(this)">Realised trades</button>
+        <button data-pane="orders" onclick="tab(this)">Order history</button>
+        <button data-pane="decisions" onclick="tab(this)">Decisions</button>
+        <button data-pane="raw" onclick="tab(this)">Run JSON</button>
+      </div>
+      <div id="charts" class="pane active"><h3>Equity curve</h3><div id="equityChart" class="chart"></div><h3>Underlying history</h3><div id="spotChart" class="chart"></div></div>
+      <div id="trades" class="pane"><div id="tradesTable"></div></div>
+      <div id="orders" class="pane"><div id="ordersTable"></div></div>
+      <div id="decisions" class="pane"><div id="decisionsTable"></div></div>
+      <div id="raw" class="pane"><pre id="rawJson" style="white-space:pre-wrap;font-size:11px;max-height:600px;overflow:auto"></pre></div>
+    </div>
+  </section>
+  <section class="card"><h2>Previous runs</h2><div id="runs"></div></section>
+</main>
+</div>
+</div>
+<script>
+let authInfo={},symbolsData=[];
+const $=id=>document.getElementById(id);
+function msg(text,error=false){$('message').innerHTML=text?`<div class="${error?'error':'ok'}">${escapeHtml(text)}</div>`:''}
+function escapeHtml(x){return String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+async function api(path,opts={}){const r=await fetch(path,{headers:{'content-type':'application/json'},...opts});let d;try{d=await r.json()}catch{d={detail:await r.text()}}if(!r.ok)throw new Error(d.detail||JSON.stringify(d));return d}
+async function loadAuth(){authInfo=await api('/api/auth');$('authStatus').textContent=`Credentials: ${authInfo.credentials_configured?'configured':'missing'}\nSession token: ${authInfo.session_token_available?'available':'missing'}\nClient: ${authInfo.client_active?'active':'not yet activated'}`}
+function openLogin(){if(authInfo.login_url) window.open(authInfo.login_url,'_blank')}
+async function activateSession(){try{msg('');await api('/api/auth/session',{method:'POST',body:JSON.stringify({token:$('sessionToken').value})});$('sessionToken').value='';await loadAuth();msg('Breeze session activated.')}catch(e){msg(e.message,true)}}
+async function loadSymbols(){symbolsData=await api('/api/symbols');$('symbols').innerHTML=symbolsData.length?'':'<span class="muted">No tracked symbols yet.</span>';$('btSymbol').innerHTML='';for(const s of symbolsData){const div=document.createElement('div');div.className='symbol';div.innerHTML=`<strong>${escapeHtml(s.name)}</strong><span class="muted">${escapeHtml(s.stock_code)} · step ${s.strike_step} · lot ${s.lot_size} · ${s.active?'active':'paused'}</span><div class="actions"><button class="secondary" onclick="toggleSymbol(${s.id},${s.active?0:1})">${s.active?'Pause':'Activate'}</button><button class="danger" onclick="deleteSymbol(${s.id})">Delete</button></div>`;$('symbols').appendChild(div);if(s.active){const o=document.createElement('option');o.value=s.id;o.textContent=s.name+' ('+s.stock_code+')';$('btSymbol').appendChild(o)}}}
+async function addSymbol(){try{const body={name:$('symName').value,stock_code:$('symCode').value,strike_step:+$('symStep').value,lot_size:+$('symLot').value,cash_exchange:$('symCash').value,option_exchange:$('symOpt').value};await api('/api/symbols',{method:'POST',body:JSON.stringify(body)});await loadSymbols();msg('Symbol added.')}catch(e){msg(e.message,true)}}
+async function toggleSymbol(id,a){await api(`/api/symbols/${id}/${a}`,{method:'PATCH'});await loadSymbols()}
+async function deleteSymbol(id){try{await api(`/api/symbols/${id}`,{method:'DELETE'});await loadSymbols()}catch(e){msg('Cannot delete a symbol referenced by prior runs. Pause it instead.\n'+e.message,true)}}
+function num(id){return +$(id).value}
+async function runBacktest(){if(!$('btSymbol').value){msg('Add an active tracked symbol first.',true);return}const body={symbol_id:+$('btSymbol').value,start_date:$('btStart').value,end_date:$('btEnd').value,expiry:$('btExpiry').value,interval:$('btInterval').value,engine:$('btEngine').value,strike_offsets:num('btOffsets'),warmup_bars:num('btWarm'),decision_every_bars:num('btCadence'),event_trigger_pct:num('btTrigger'),lots:num('btLots'),min_confidence:num('btConf'),max_trades_per_day:num('btMaxTrades'),max_capital_per_trade:num('btMaxCapital'),stop_loss_pct:num('btStop'),take_profit_pct:num('btTarget'),max_hold_bars:num('btHold'),entry_cutoff:$('btCutoff').value,square_off:$('btSquare').value,slippage_bps:num('btSlip'),fees_bps_per_side:num('btFees'),brokerage_per_order:num('btBroker'),max_contracts:num('btMaxContracts'),refresh_data:$('btRefresh').value==='true'};if(!body.start_date||!body.end_date||!body.expiry){msg('Start date, end date and expiry are required.',true);return}try{$('backtestCard').classList.add('busy');$('runBtn').textContent='Running…';msg('');const d=await api('/api/backtests',{method:'POST',body:JSON.stringify(body)});renderRun(d);await loadRuns()}catch(e){msg(e.message,true)}finally{$('backtestCard').classList.remove('busy');$('runBtn').textContent='Run backtest'}}
+function metric(k,v){return `<div class="metric"><div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(v)}</div></div>`}
+function renderRun(d){$('emptyResult').style.display='none';$('result').style.display='block';const s=d.summary||{};$('metrics').innerHTML=metric('Net P&L',fmtMoney(s.net_pnl))+metric('Trades',s.trades??0)+metric('Win rate',(s.win_rate_pct??0)+'%')+metric('Max drawdown',fmtMoney(s.max_drawdown))+metric('Profit factor',s.profit_factor??0)+metric('Contracts loaded',s.option_contracts_loaded??0);drawLine('equityChart',d.series?.equity_curve||[],'ts','equity','Realised equity');drawLine('spotChart',d.series?.spot_curve||[],'ts','spot','Spot');table('tradesTable',d.trades||[]);table('ordersTable',d.orders||[]);table('decisionsTable',(d.decisions||[]).map(x=>({...x,probabilities:JSON.stringify(x.probabilities)})));$('rawJson').textContent=JSON.stringify(d,null,2)}
+function fmtMoney(x){return Number(x||0).toLocaleString('en-IN',{maximumFractionDigits:2})}
+function table(id,rows){const el=$(id);if(!rows.length){el.innerHTML='<div class="status">No rows.</div>';return}const cols=Object.keys(rows[0]);el.innerHTML='<div class="tablewrap"><table><thead><tr>'+cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(c=>`<td>${escapeHtml(typeof r[c]==='object'?JSON.stringify(r[c]):r[c])}</td>`).join('')+'</tr>').join('')+'</tbody></table></div>'}
+function drawLine(id,data,xk,yk,label){const el=$(id);if(!data.length){el.innerHTML='<div class="status" style="margin:12px">No data</div>';return}const w=1000,h=260,p=35;const vals=data.map(d=>+d[yk]).filter(Number.isFinite),mn=Math.min(...vals),mx=Math.max(...vals),span=(mx-mn)||1;const pts=data.map((d,i)=>{const x=p+i*(w-2*p)/Math.max(1,data.length-1),y=h-p-(+d[yk]-mn)*(h-2*p)/span;return `${x.toFixed(1)},${y.toFixed(1)}`}).join(' ');el.innerHTML=`<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><line x1="${p}" y1="${p}" x2="${p}" y2="${h-p}" stroke="#d4d4d8"/><line x1="${p}" y1="${h-p}" x2="${w-p}" y2="${h-p}" stroke="#d4d4d8"/><polyline points="${pts}" fill="none" stroke="#18181b" stroke-width="2" vector-effect="non-scaling-stroke"/><text x="8" y="${p+4}" font-size="12">${escapeHtml(mx.toFixed(2))}</text><text x="8" y="${h-p}" font-size="12">${escapeHtml(mn.toFixed(2))}</text><text x="${p}" y="18" font-size="12">${escapeHtml(label)}</text></svg>`}
+function tab(btn){document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));btn.classList.add('active');$(btn.dataset.pane).classList.add('active')}
+async function loadRuns(){const rs=await api('/api/backtests');if(!rs.length){$('runs').innerHTML='<span class="muted">No prior runs.</span>';return}$('runs').innerHTML='<div class="tablewrap"><table><thead><tr><th>ID</th><th>Created</th><th>Symbol</th><th>Engine</th><th>Dates</th><th>Status</th><th>Net P&L</th><th></th></tr></thead><tbody>'+rs.map(r=>`<tr><td>${r.id}</td><td>${escapeHtml(r.created_at)}</td><td>${escapeHtml(r.symbol_name)}</td><td>${escapeHtml(r.engine)}</td><td>${escapeHtml(r.start_date)} → ${escapeHtml(r.end_date)}</td><td>${escapeHtml(r.status)}</td><td>${fmtMoney(r.summary?.net_pnl)}</td><td><button style="padding:4px 8px" onclick="loadRun(${r.id})">Load</button></td></tr>`).join('')+'</tbody></table></div>'}
+async function loadRun(id){try{renderRun(await api('/api/backtests/'+id));window.scrollTo({top:600,behavior:'smooth'})}catch(e){msg(e.message,true)}}
+(async()=>{const today=new Date();const iso=d=>d.toISOString().slice(0,10);const end=new Date(today);end.setDate(end.getDate()-1);const start=new Date(end);start.setDate(start.getDate()-4);$('btStart').value=iso(start);$('btEnd').value=iso(end);await Promise.all([loadAuth(),loadSymbols(),loadRuns()])})().catch(e=>msg(e.message,true));
+</script>
+</body>
+</html>
